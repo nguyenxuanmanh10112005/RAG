@@ -196,3 +196,4 @@ Tạo bộ dataset kiểm thử tự động để đánh giá RAG.
 Nguyễn Xuân Mạnh
 🎓 Đồ án: Xây dựng hệ thống hỏi đáp Bộ luật Lao động Việt Nam bằng RAG và LLM
 🧠 Công nghệ: Python · FAISS · Ollama · Streamlit · SentenceTransformers · phi3-mini
+
