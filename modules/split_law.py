@@ -1,73 +1,84 @@
-import re
-import os
-import textwrap
-from PyPDF2 import PdfReader
+# modules/split_law.py
+import fitz, re, os, json
 
-def extract_text(pdf_path: str) -> str:
-    """Đọc toàn bộ nội dung PDF và chuẩn hóa văn bản."""
-    reader = PdfReader(pdf_path)
-    text = "\n".join(page.extract_text() or "" for page in reader.pages)
+def extract_text(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text("text") + "\n"
+    return text
 
-    # Gộp dòng, xóa khoảng trắng thừa, sửa lỗi OCR phổ biến
-    text = re.sub(r'\s+', ' ', text)
-    text = text.replace('Đi ều', 'Điều')
-    text = text.replace('Ðiều', 'Điều')  # OCR lỗi thường gặp
-    return text.strip()
-
-def split_articles(text: str):
-    """
-    Tách văn bản luật thành từng điều:
-    - Dựa vào 'Điều X.' ở đầu dòng hoặc sau xuống dòng.
-    - Giữ nguyên phần tiêu đề của điều.
-    """
-    # Thêm xuống dòng trước mỗi "Điều X."
-    text = re.sub(r'(?<!\n)(Điều\s+\d+\.)', r'\n\1', text)
-
-    # Regex nhận tiêu đề mỗi điều ở đầu dòng
-    header_re = re.compile(r'(?m)^\s*(Điều\s+\d+\.[^\n]*)')
-    matches = list(header_re.finditer(text))
-
+def split_articles(text):
+    lines = text.split('\n')
     articles = []
-    for i, m in enumerate(matches):
-        start = m.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+    current_title = ""
+    current_content = []
+    in_article = False
 
-        header = m.group(1).strip()
-        body_raw = text[m.end():end].strip()
+    # Regex: "Điều X." + chữ in hoa
+    article_pattern = re.compile(r"^Điều\s+\d+[a-zA-Z]?\.\s*[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯ]")
 
-        # Làm sạch nội dung
-        body_single_line = " ".join(body_raw.split())
-        body_wrapped = "\n".join(textwrap.wrap(body_single_line, width=100))
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if article_pattern.match(line):
+            if in_article and current_title:
+                articles.append({
+                    "title": current_title,
+                    "content": "\n".join(current_content).strip()
+                })
+            current_title = re.sub(r"\s+", " ", line).strip()
+            if not current_title.endswith("."):
+                current_title += "."
+            current_content = []
+            in_article = True
+        else:
+            if in_article:
+                current_content.append(line)
 
-        # Lấy số điều
-        num_match = re.search(r'Điều\s+(\d+)', header)
-        number = num_match.group(1) if num_match else "NA"
-
+    if in_article and current_title:
         articles.append({
-            "number": number,
-            "header": header,
-            "body": body_wrapped
+            "title": current_title,
+            "content": "\n".join(current_content).strip()
         })
 
-    print(f"✅ Phát hiện {len(articles)} điều luật trong văn bản.")
     return articles
 
-def save_articles(articles, out_dir: str):
-    """Lưu từng điều ra file riêng."""
-    os.makedirs(out_dir, exist_ok=True)
-    for a in articles:
-        fname = f"{int(a['number']):03d}_Dieu_{a['number']}.txt"
-        path = os.path.join(out_dir, fname)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(a['header'] + "\n\n")
-            f.write(a['body'] + "\n")
-    print(f"🎯 Đã lưu {len(articles)} điều vào thư mục {out_dir}")
+def save_articles(articles):
+    os.makedirs("storage/articles", exist_ok=True)
+    metadata = []
+
+    for art in articles:
+        match = re.search(r"Điều\s+(\d+)", art['title'])
+        num = match.group(1) if match else "000"
+        safe_id = f"dieu_{int(num):03d}"
+        filename = f"storage/articles/{safe_id}.txt"
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(art['content'])
+
+        metadata.append({
+            "id": safe_id,
+            "title": art['title'],
+            "file": filename
+        })
+
+    with open("storage/law_metadata.json", 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=4)
+
+    print(f"TÁCH THÀNH CÔNG {len(articles)} ĐIỀU!")
+    print("   → dieu_001.txt: Phạm vi điều chỉnh...")
+    print("   → dieu_113.txt: Nghỉ hằng năm...")
 
 if __name__ == "__main__":
     pdf_path = "data/luat_lao_dong.pdf"
-    output_dir = "storage/articles"
-
-    print("📖 Đang đọc file PDF...")
-    text = extract_text(pdf_path)
-    articles = split_articles(text)
-    save_articles(articles, output_dir)
+    if not os.path.exists(pdf_path):
+        print("Không tìm thấy PDF! Đặt vào data/luat_lao_dong.pdf")
+    else:
+        print("Đang đọc PDF...")
+        text = extract_text(pdf_path)
+        print("Đang tách 69 Điều...")
+        articles = split_articles(text)
+        save_articles(articles)
+        print("HOÀN TẤT!")

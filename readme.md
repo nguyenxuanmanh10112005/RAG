@@ -1,199 +1,213 @@
-HỆ THỐNG HỎI ĐÁP LUẬT VIỆT NAM (RAG + LLM OFFLINE)
-📘 Giới thiệu
+# Hệ thống Hỏi Đáp Luật Lao Động (RAG)
 
-Dự án này xây dựng một hệ thống hỏi đáp tự động dựa trên Bộ luật Lao động Việt Nam, ứng dụng kỹ thuật RAG (Retrieval-Augmented Generation) kết hợp với LLM (phi3:mini) chạy hoàn toàn offline.
+## Giới thiệu
 
-Hệ thống có khả năng:
+Hệ thống RAG (Retrieval-Augmented Generation) để hỏi đáp về Bộ luật Lao động Việt Nam. Sử dụng FAISS để tìm kiếm vector và Ollama (llama3.2:1b) để tạo câu trả lời. Hoạt động hoàn toàn offline sau khi cài đặt.
 
-Tìm kiếm điều luật phù hợp với câu hỏi bằng FAISS.
+## Công nghệ sử dụng
 
-Cung cấp nội dung điều luật đó làm context cho mô hình ngôn ngữ.
+- **Python 3.8+**
+- **FAISS** - Vector database để tìm kiếm ngữ nghĩa
+- **SentenceTransformers** - Tạo embedding (bkai-foundation-models/vietnamese-bi-encoder)
+- **Ollama** - Chạy LLM offline (llama3.2:1b)
+- **Streamlit** - Giao diện web đơn giản
 
-Mô hình phi3:mini (qua Ollama) sinh ra câu trả lời tự nhiên, dễ hiểu, chính xác.
+## Cấu trúc project
 
-Không cần mạng, không cần API, có thể chạy hoàn toàn trên máy cá nhân.
-
-🧠 Kiến trúc hệ thống
-          +---------------------------+
-          |   Người dùng nhập câu hỏi |
-          +-------------+-------------+
-                        |
-                        v
-              +---------+---------+
-              |  Bước 1: Embedding |
-              |  (MiniLM-L3-v2)   |
-              +---------+---------+
-                        |
-                        v
-              +---------+---------+
-              |  Bước 2: Indexing  |
-              |   (FAISS Search)  |
-              +---------+---------+
-                        |
-                        v
-              +---------+---------+
-              |  Bước 3: Retrieving|
-              |  Trích điều luật   |
-              +---------+---------+
-                        |
-                        v
-              +---------+---------+
-              | Bước 4: Answering  |
-              | (LLM: phi3:mini)   |
-              +---------+---------+
-                        |
-                        v
-              +---------+---------+
-              |  Câu trả lời cuối  |
-              +--------------------+
-
-📂 Cấu trúc thư mục dự án
-rag_law_project/
-├── app.py                         # Ứng dụng Streamlit chính (web hỏi đáp)
-│
+```
+RAG/
+├── data/
+│   └── luat_lao_dong.pdf          # File PDF gốc
 ├── modules/
-│   ├── split_law.py               # Tách PDF luật thành từng điều riêng lẻ
-│   ├── build_faiss.py             # (Tùy chọn) tạo index FAISS từ các điều luật
-│
+│   ├── split_law.py               # Tách PDF thành từng điều
+│   ├── embed_law.py               # Tạo vector database
+│   ├── retriever.py               # Class tìm kiếm
+│   └── web_app.py                 # App chính (Streamlit)
 ├── storage/
-│   ├── law_index.faiss            # CSDL FAISS chứa vector embedding
-│   ├── law_metadata.json          # Metadata: nội dung & số điều tương ứng
-│
-├── output_articles/               # Kết quả tách từng điều luật (tạo bởi split_law.py)
-│   ├── 001_Dieu_1.txt
-│   ├── 002_Dieu_2.txt
-│   └── ...
-│
-├── luat_lao_dong.pdf              # File Bộ luật Lao động gốc
-├── requirements.txt               # Thư viện cần cài đặt
-└── README.md                      # Tài liệu hướng dẫn (file này)
+│   ├── articles/                  # 69 file điều luật đã tách
+│   ├── law_index.faiss           # FAISS index
+│   └── law_metadata.json          # Metadata
+└── requirements.txt
+```
 
-⚙️ Thành phần chính
-Thành phần	Công nghệ / Thư viện	Vai trò
-Chunking	PyPDF2, Regex	Tách văn bản luật thành các điều
-Embedding	SentenceTransformer (MiniLM-L3-v2)	Mã hóa điều luật thành vector
-Indexing	FAISS	Lưu trữ và tìm kiếm vector điều luật
-Retrieving	FAISS Search	Lấy điều luật phù hợp nhất với câu hỏi
-Answering	Ollama + phi3:mini	Sinh câu trả lời tự nhiên bằng LLM
-Frontend	Streamlit	Giao diện web thân thiện
-🪜 Các bước xây dựng hệ thống
-1️⃣ Chunking (Tách điều luật)
+## Cài đặt
 
-Đọc file PDF luật (luat_lao_dong.pdf)
+### 1. Cài đặt Python packages
 
-Dùng regex để tách theo mẫu Điều X.
-
-Mỗi điều được lưu vào file riêng (001_Dieu_1.txt, 002_Dieu_2.txt, ...)
-
-👉 Thực thi:
-
-python modules/split_law.py luat_lao_dong.pdf --out output_articles
-
-2️⃣ Embedding
-
-Mỗi điều luật được mã hóa thành vector bằng mô hình paraphrase-MiniLM-L3-v2.
-
-Các vector được lưu cùng metadata để sử dụng lại nhanh chóng.
-
-3️⃣ Indexing (FAISS)
-
-Dùng FAISS để tạo chỉ mục vector.
-
-Cho phép tìm kiếm nhanh các điều luật tương đồng về ngữ nghĩa.
-
-4️⃣ Retrieving
-
-Khi người dùng nhập câu hỏi:
-
-Sinh embedding cho câu hỏi.
-
-So sánh với FAISS để lấy ra điều gần nhất (top_k=1).
-
-Điều đó được đưa vào làm context cho LLM.
-
-5️⃣ Answering
-
-Context được truyền cho mô hình phi3:mini:Q4_K_M (qua Ollama).
-
-Mô hình sinh ra câu trả lời ngắn gọn, đúng trọng tâm.
-
-Nếu không tìm thấy điều phù hợp → trả lời mặc định:
-
-“Không có thông tin trong Bộ luật Lao động hiện hành.”
-
-⚙️ Cấu hình khuyến nghị (CPU 16GB RAM)
-Thành phần	Model / Thiết lập	Ghi chú
-Embedding	paraphrase-MiniLM-L3-v2	nhẹ, nhanh
-FAISS top_k	1	chỉ lấy điều phù hợp nhất
-LLM	phi3:mini:Q4_K_M	lượng tử hóa 4-bit, giảm RAM 40%
-Giới hạn context	3000 ký tự	tránh quá tải bộ nhớ
-Trả lời	≤ 100 từ	nhanh, ngắn gọn
-Ollama	--keepalive 60	giữ model trong RAM sau khi gọi
-💻 Cách cài đặt và chạy
-1️⃣ Clone project
-git clone https://github.com/yourname/rag_law_project.git
-cd rag_law_project
-
-2️⃣ Cài thư viện Python
+```bash
 pip install -r requirements.txt
+```
 
+### 2. Cài đặt Ollama
 
-Hoặc:
+1. Tải Ollama: https://ollama.com/download
+2. Cài đặt xong, mở terminal chạy:
 
-pip install streamlit faiss-cpu sentence-transformers PyPDF2
+```bash
+ollama pull llama3.2:1b
+```
 
-3️⃣ Cài Ollama và tải mô hình
+### 3. Xây dựng database
 
-Tải Ollama từ: https://ollama.com/download
+```bash
+# Bước 1: Tách PDF thành các điều luật
+python modules/split_law.py
 
-Sau khi cài, tải mô hình lượng tử hóa nhẹ:
+# Bước 2: Tạo vector embeddings và FAISS index
+python modules/embed_law.py
+```
 
-ollama pull phi3:mini:Q4_K_M
+**Lưu ý:** Cần có file `data/luat_lao_dong.pdf` trước khi chạy.
 
+## Chạy ứng dụng
 
-(Tùy chọn) giữ model trong RAM để trả lời nhanh hơn:
+```bash
+# Chạy từ thư mục gốc của project
+streamlit run modules/web_app.py
+```
 
-ollama serve
+Trình duyệt sẽ tự động mở tại `http://localhost:8501`
 
-4️⃣ Chạy ứng dụng web
-streamlit run app.py
+## Cách hoạt động
 
+1. **Nhập câu hỏi** → Ví dụ: "Điều 1 nói về gì?"
+2. **Tìm kiếm vector** → FAISS tìm 3 điều luật liên quan nhất
+3. **Tạo câu trả lời** → Ollama LLM dựa trên context tìm được
+4. **Hiển thị kết quả** → Câu trả lời + nguồn tham khảo
 
-Sau đó mở trình duyệt tại:
-👉 http://localhost:8501
+## Ví dụ sử dụng
 
-💬 Ví dụ câu hỏi
-Câu hỏi	Kết quả kỳ vọng
-“Điều 1 là gì?”	Trả nội dung Điều 1 (Phạm vi điều chỉnh)
-“Người lao động được nghỉ phép năm bao nhiêu ngày?”	Trích Điều 113
-“Điều 25 nói gì về thử việc?”	Trả nội dung Điều 25
-“Điều 100 nói gì?”	“Không có thông tin trong Bộ luật Lao động hiện hành.”
-⚙️ Các tối ưu hiệu năng
-Tối ưu	Mô tả
-top_k=1	chỉ lấy 1 điều luật → tốc độ nhanh hơn 3×
-context ≤ 3000 ký tự	tránh tắc nghẽn bộ nhớ
-Giới hạn câu trả lời ≤ 100 từ	sinh nhanh hơn
-phi3:mini:Q4_K_M	nhẹ hơn 40–50%, RAM chỉ ~2GB
-ollama serve + --keepalive 60	lần sau trả lời gần như tức thì
-📈 Kết quả thực tế
-Chỉ số	Trước tối ưu	Sau tối ưu
-Load model lần đầu	~30s	~10s
-Thời gian trả lời	10–15s	4–6s
-RAM sử dụng	4.2 GB	2.1 GB
-Độ chính xác	93%	92%
-🧩 Hướng phát triển
+- "Điều 1 nói về gì?"
+- "Quyền của người lao động"
+- "Nghỉ phép năm như thế nào?"
+- "Thời hạn thử việc là bao lâu?"
+- "Mức lương tối thiểu"
 
-Mở rộng sang nhiều bộ luật khác.
+## Yêu cầu hệ thống
 
-Cho phép người dùng upload file PDF mới để tự động xây FAISS.
+- **Python 3.8+**
+- **RAM:** 16GB+ (llama3.2:1b),
+- **Ollama** đã cài đặt
+- **Dung lượng:** ~3-5GB (bao gồm models và data)
 
-Tích hợp API online (GPT-4o-mini, Qwen-API) để so sánh hiệu suất.
+### Các model khuyến nghị
 
-Tạo bộ dataset kiểm thử tự động để đánh giá RAG.
+| Model | Kích thước | RAM cần | Đặc điểm |
+|-------|------------|---------|----------|
+| `qwen2:0.5b` | 352MB | 1GB | Siêu nhẹ, phù hợp máy yếu |
+| `qwen2:1.5b` | 934MB | 2GB | Nhẹ, cân bằng tốt |
+| `llama3.2:1b` | 1.3GB | 2GB | **Khuyến nghị** - Ổn định nhất |
+| `gemma2:2b` | 1.6GB | 4GB | Chất lượng tốt |
+| `llama3.2:3b` | 2.0GB | 6GB | Chất lượng cao |
+| `phi3:latest` | 2.2GB | 8GB | Mạnh nhất |
 
-👨‍💻 Tác giả
+## Troubleshooting
 
-Nguyễn Xuân Mạnh
-🎓 Đồ án: Xây dựng hệ thống hỏi đáp Bộ luật Lao động Việt Nam bằng RAG và LLM
-🧠 Công nghệ: Python · FAISS · Ollama · Streamlit · SentenceTransformers · phi3-mini
+### Không tìm thấy file PDF
+```bash
+# Đặt file PDF vào đúng vị trí
+mkdir -p data
+# Copy file luat_lao_dong.pdf vào thư mục data/
+```
 
+### Không tìm thấy FAISS index
+```bash
+# Tạo lại vector database
+python modules/embed_law.py
+```
+
+### Ollama không hoạt động
+```bash
+# Kiểm tra Ollama
+ollama --version
+ollama serve  # Khởi động Ollama server
+
+# Kiểm tra models
+ollama list
+```
+
+### Model không tồn tại
+```bash
+# Tải model khuyến nghị
+ollama pull llama3.2:1b
+
+# Hoặc model nhẹ hơn
+ollama pull qwen2:0.5b
+```
+
+### Lỗi import modules
+- Đảm bảo chạy từ thư mục gốc (không phải từ trong `modules/`)
+- Kiểm tra Python path và dependencies
+
+### Model trả lời chậm/sai
+- Thử model lớn hơn: `llama3.2:3b` hoặc `phi3:latest`
+- Tăng số lượng context trong code
+- Kiểm tra RAM còn đủ không
+
+## Cải thiện chất lượng
+
+### 1. Nâng cấp model LLM
+```bash
+# Model chất lượng cao hơn
+ollama pull llama3.2:3b
+ollama pull phi3:latest
+```
+
+Sửa trong `modules/web_app.py`:
+```python
+LLM_MODEL = "llama3.2:3b"  # Thay vì "llama3.2:1b"
+```
+
+### 2. Tăng số lượng context
+Sửa trong `modules/web_app.py`:
+```python
+context = retriever.search(prompt, k=5)  # Tăng từ 3 lên 5
+```
+
+### 3. Tinh chỉnh embedding model
+Nếu muốn thử model embedding khác, sửa trong `modules/embed_law.py` và `modules/retriever.py`:
+```python
+MODEL_NAME = "keepitreal/vietnamese-sbert"  # Model khác
+```
+**Lưu ý:** Phải chạy lại `embed_law.py` sau khi đổi model embedding.
+
+## Tính năng
+
+- Tìm kiếm ngữ nghĩa chính xác với Vietnamese BERT
+- Auto-fallback models - Tự động chọn model khả dụng
+- Hiển thị nguồn tham khảo với độ liên quan
+- Error handling thông minh với gợi ý sửa lỗi
+- Giao diện đơn giản, dễ sử dụng
+- Hoạt động offline hoàn toàn
+
+## Performance
+
+### Thời gian phản hồi trung bình
+- **Tìm kiếm:** ~0.1-0.3s (FAISS)
+- **Tạo câu trả lời:** ~2-10s (tùy model)
+- **Tổng cộng:** ~3-15s
+
+### Tips tối ưu
+- Dùng SSD thay vì HDD để tăng tốc I/O
+- Đóng các app khác khi chạy model lớn
+- Restart Ollama nếu phản hồi chậm
+
+## Roadmap
+
+- [ ] Thêm support cho nhiều bộ luật khác
+- [ ] Cải thiện prompt engineering
+- [ ] Thêm tính năng export câu trả lời
+- [ ] Tích hợp voice input/output
+- [ ] API endpoint cho integration
+
+## Đóng góp
+
+Mọi đóng góp đều được chào đón! Hãy tạo issue hoặc pull request.
+
+## License
+
+MIT License - Tự do sử dụng và chỉnh sửa.
+
+---
+
+**Chúc bạn sử dụng vui vẻ!**
