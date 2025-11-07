@@ -67,8 +67,6 @@ def save_articles(articles):
         json.dump(metadata, f, ensure_ascii=False, indent=4)
 
     print(f"Đã tách thành công {len(articles)} điều luật!")
-    print("Ví dụ: dieu_001.txt - Phạm vi điều chỉnh")
-    print("       dieu_113.txt - Nghỉ hằng năm")
 
 if __name__ == "__main__":
     pdf_path = "data/luat_lao_dong.pdf"
