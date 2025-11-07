@@ -1,4 +1,3 @@
-# modules/split_law.py
 import fitz, re, os, json
 
 def extract_text(pdf_path):
@@ -15,7 +14,7 @@ def split_articles(text):
     current_content = []
     in_article = False
 
-    # Regex: "Điều X." + chữ in hoa
+    # Pattern để nhận diện điều luật
     article_pattern = re.compile(r"^Điều\s+\d+[a-zA-Z]?\.\s*[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠƯ]")
 
     for line in lines:
@@ -67,18 +66,18 @@ def save_articles(articles):
     with open("storage/law_metadata.json", 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=4)
 
-    print(f"TÁCH THÀNH CÔNG {len(articles)} ĐIỀU!")
-    print("   → dieu_001.txt: Phạm vi điều chỉnh...")
-    print("   → dieu_113.txt: Nghỉ hằng năm...")
+    print(f"Đã tách thành công {len(articles)} điều luật!")
+    print("Ví dụ: dieu_001.txt - Phạm vi điều chỉnh")
+    print("       dieu_113.txt - Nghỉ hằng năm")
 
 if __name__ == "__main__":
     pdf_path = "data/luat_lao_dong.pdf"
     if not os.path.exists(pdf_path):
-        print("Không tìm thấy PDF! Đặt vào data/luat_lao_dong.pdf")
+        print("Không tìm thấy PDF. Đặt file vào data/luat_lao_dong.pdf")
     else:
         print("Đang đọc PDF...")
         text = extract_text(pdf_path)
-        print("Đang tách 69 Điều...")
+        print("Đang tách các điều luật...")
         articles = split_articles(text)
         save_articles(articles)
-        print("HOÀN TẤT!")
+        print("Hoàn tất!")
